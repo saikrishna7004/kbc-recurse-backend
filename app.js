@@ -22,6 +22,10 @@ let highlightedOption = { index: null, type: null };
 let lastBroadcastTime = 0;
 let currentScreen = "logo";
 
+app.get("/", (req, res) => {
+    res.send("Server is running");
+});
+
 io.on("connection", (socket) => {
     if (currentQuestion) {
         socket.emit("display-question", currentQuestion);
@@ -29,7 +33,7 @@ io.on("connection", (socket) => {
             socket.emit("show-options");
             updateTimerForClient(socket, false);
         }
-        
+
         if (highlightedOption.index !== null) {
             if (highlightedOption.type === "selected") {
                 socket.emit("highlight-answer", highlightedOption.index);
@@ -42,23 +46,23 @@ io.on("connection", (socket) => {
     }
 
     socket.emit("change-screen", currentScreen);
-    
-    socket.emit("timer-state", { 
-        state: timerStarted ? (timerPaused ? "paused" : "running") : "stopped" 
+
+    socket.emit("timer-state", {
+        state: timerStarted ? (timerPaused ? "paused" : "running") : "stopped"
     });
 
     socket.on("question-update", (data) => {
-        if (!data.text || !data.text.trim() || 
+        if (!data.text || !data.text.trim() ||
             !data.options || data.options.some(opt => !opt || !opt.trim())) {
             return;
         }
 
         timerMaxValue = timerValue;
         currentTimerValue = timerValue;
-        
+
         if (timerStarted) {
             if (currentQuestion) {
-                currentQuestion = { 
+                currentQuestion = {
                     ...currentQuestion,
                     text: data.text,
                     options: data.options
@@ -70,27 +74,27 @@ io.on("connection", (socket) => {
             timerStartTime = null;
             timerStarted = false;
             highlightedOption = { index: null, type: null };
-            currentQuestion = { 
-                ...data, 
+            currentQuestion = {
+                ...data,
                 timer: timerValue,
                 maxTimer: timerMaxValue,
                 showOptions: false
             };
         }
-        
+
         io.emit("display-question", currentQuestion);
         io.emit("timer-state", { state: timerStarted ? (timerPaused ? "paused" : "running") : "stopped" });
     });
 
     socket.on("show-options", () => {
         if (!currentQuestion || timerStarted) return;
-        
+
         currentQuestion.showOptions = true;
         timerPaused = false;
         timerStartTime = Date.now();
         currentTimerValue = timerValue;
         timerStarted = true;
-        
+
         io.emit("show-options");
         io.emit("update-timer", {
             current: currentTimerValue,
@@ -176,8 +180,8 @@ io.on("connection", (socket) => {
 
     socket.on("get-timer", () => {
         updateTimerForClient(socket, false);
-        socket.emit("timer-state", { 
-            state: timerStarted ? (timerPaused ? "paused" : "running") : "stopped" 
+        socket.emit("timer-state", {
+            state: timerStarted ? (timerPaused ? "paused" : "running") : "stopped"
         });
     });
 
@@ -193,17 +197,17 @@ io.on("connection", (socket) => {
             timerStartTime = Date.now() - (timerPausedAt - (timerStartTime || 0));
             timerPaused = false;
             timerPausedAt = null;
-            
+
             const elapsedSeconds = Math.floor((Date.now() - timerStartTime) / 1000);
             const remainingTime = Math.max(0, timerValue - elapsedSeconds);
             const audioOffset = 59 - remainingTime;
-            
+
             io.emit("unfreeze-timer", true, audioOffset);
             updateTimerForAllClients(true, audioOffset);
             io.emit("timer-state", { state: "running" });
         }
     });
-    
+
     socket.on("set-screen", (screen) => {
         currentScreen = screen;
         io.emit("change-screen", screen);
@@ -270,9 +274,9 @@ function updateTimerForAllClients(triggerAudio = false, audioOffset = 0) {
     if (!triggerAudio && now - lastBroadcastTime < 950) {
         return;
     }
-    
+
     lastBroadcastTime = now;
-    
+
     io.sockets.sockets.forEach(socket => {
         updateTimerForClient(socket, triggerAudio, audioOffset);
     });
